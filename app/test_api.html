@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ARIMA API Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        select, input, button {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .result {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 15px;
+            border-left: 4px solid #007bff;
+        }
+        .error {
+            border-left-color: #dc3545;
+            background-color: #f8d7da;
+        }
+        #chartContainer {
+            margin-top: 20px;
+            height: 400px;
+        }
+        .endpoint-test {
+            margin-bottom: 30px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .endpoint-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #007bff;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 ARIMA API Local Test</h1>
+    <p><strong>API Base URL:</strong> <span id="apiUrl">http://localhost:5000</span></p>
+
+    <!-- Test Basic Endpoints -->
+    <div class="container">
+        <h2>📋 Basic API Tests</h2>
+        
+        <div class="endpoint-test">
+            <div class="endpoint-title">1. Test Crime Types</div>
+            <button onclick="testCrimeTypes()">Get Crime Types</button>
+            <div id="crimeTypesResult" class="result" style="display:none;"></div>
+        </div>
+
+        <div class="endpoint-test">
+            <div class="endpoint-title">2. Test Locations</div>
+            <button onclick="testLocations()">Get Locations</button>
+            <div id="locationsResult" class="result" style="display:none;"></div>
+        </div>
+
+        <div class="endpoint-test">
+            <div class="endpoint-title">3. Test Models List</div>
+            <button onclick="testModels()">Get Available Models</button>
+            <div id="modelsResult" class="result" style="display:none;"></div>
+        </div>
+    </div>
+
+    <!-- Test Forecast -->
+    <div class="container">
+        <h2>📊 Forecast Test</h2>
+        <div class="form-group">
+            <label for="crimeType">Crime Type:</label>
+            <select id="crimeType">
+                <option value="">Select Crime Type</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="location">Location:</label>
+            <select id="location">
+                <option value="">Select Location</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="months">Forecast Months:</label>
+            <input type="number" id="months" value="12" min="1" max="24">
+        </div>
+        
+        <button onclick="getForecast()">Get Forecast</button>
+        <button onclick="getVisualization()">Get Visualization Data</button>
+        
+        <div id="forecastResult" class="result" style="display:none;"></div>
+        
+        <div id="chartContainer">
+            <canvas id="forecastChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000';
+        let chart = null;
+
+        // Load crime types and locations on page load
+        window.onload = function() {
+            loadCrimeTypes();
+            loadLocations();
+        };
+
+        async function testCrimeTypes() {
+            try {
+                const response = await fetch(`${API_BASE}/api/crime_types`);
+                const data = await response.json();
+                showResult('crimeTypesResult', JSON.stringify(data, null, 2), false);
+            } catch (error) {
+                showResult('crimeTypesResult', `Error: ${error.message}`, true);
+            }
+        }
+
+        async function testLocations() {
+            try {
+                const response = await fetch(`${API_BASE}/api/locations`);
+                const data = await response.json();
+                showResult('locationsResult', JSON.stringify(data, null, 2), false);
+            } catch (error) {
+                showResult('locationsResult', `Error: ${error.message}`, true);
+            }
+        }
+
+        async function testModels() {
+            try {
+                const response = await fetch(`${API_BASE}/api/models`);
+                const data = await response.json();
+                showResult('modelsResult', `Found ${data.models.length} models\n\nFirst 5 models:\n${JSON.stringify(data.models.slice(0, 5), null, 2)}`, false);
+            } catch (error) {
+                showResult('modelsResult', `Error: ${error.message}`, true);
+            }
+        }
+
+        async function loadCrimeTypes() {
+            try {
+                const response = await fetch(`${API_BASE}/api/crime_types`);
+                const data = await response.json();
+                const select = document.getElementById('crimeType');
+                select.innerHTML = '<option value="">Select Crime Type</option>';
+                data.crime_types.forEach(type => {
+                    const option = document.createElement('option');
+                    option.value = type;
+                    option.textContent = type;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading crime types:', error);
+            }
+        }
+
+        async function loadLocations() {
+            try {
+                const response = await fetch(`${API_BASE}/api/locations`);
+                const data = await response.json();
+                const select = document.getElementById('location');
+                select.innerHTML = '<option value="">Select Location</option>';
+                data.locations.forEach(location => {
+                    const option = document.createElement('option');
+                    option.value = location;
+                    option.textContent = location;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading locations:', error);
+            }
+        }
+
+        async function getForecast() {
+            const crimeType = document.getElementById('crimeType').value;
+            const location = document.getElementById('location').value;
+            const months = document.getElementById('months').value;
+
+            if (!crimeType || !location) {
+                showResult('forecastResult', 'Please select both crime type and location', true);
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/forecast?crime_type=${encodeURIComponent(crimeType)}&location=${encodeURIComponent(location)}&months=${months}`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    showResult('forecastResult', `Error: ${data.error}`, true);
+                } else {
+                    showResult('forecastResult', JSON.stringify(data, null, 2), false);
+                }
+            } catch (error) {
+                showResult('forecastResult', `Error: ${error.message}`, true);
+            }
+        }
+
+        async function getVisualization() {
+            const crimeType = document.getElementById('crimeType').value;
+            const location = document.getElementById('location').value;
+            const months = document.getElementById('months').value;
+
+            if (!crimeType || !location) {
+                showResult('forecastResult', 'Please select both crime type and location', true);
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/visualization?crime_type=${encodeURIComponent(crimeType)}&location=${encodeURIComponent(location)}&months=${months}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                console.log('API Response:', data); // Debug log
+                
+                if (data.error) {
+                    showResult('forecastResult', `Error: ${data.error}`, true);
+                } else if (data.chart_config) {
+                    showResult('forecastResult', 'Visualization data loaded successfully! Check the chart below.', false);
+                    createChart(data.chart_config);
+                } else {
+                    showResult('forecastResult', 'Error: Invalid response format from API', true);
+                    console.error('Invalid API response:', data);
+                }
+            } catch (error) {
+                showResult('forecastResult', `Error: ${error.message}`, true);
+                console.error('Fetch error:', error);
+            }
+        }
+
+        function createChart(config) {
+            try {
+                const ctx = document.getElementById('forecastChart').getContext('2d');
+                
+                if (chart) {
+                    chart.destroy();
+                }
+                
+                console.log('Creating chart with config:', config); // Debug log
+                chart = new Chart(ctx, config);
+                console.log('Chart created successfully!'); // Debug log
+            } catch (error) {
+                console.error('Error creating chart:', error);
+                showResult('forecastResult', `Chart creation error: ${error.message}`, true);
+            }
+        }
+
+        function showResult(elementId, message, isError) {
+            const element = document.getElementById(elementId);
+            element.style.display = 'block';
+            element.textContent = message;
+            element.className = isError ? 'result error' : 'result';
+        }
+    </script>
+</body>
+</html>
